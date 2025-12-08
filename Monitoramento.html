@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento Climático - Acesso Restrito</title>
+
+    <!-- Bibliotecas Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Estilo Personalizado -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        /* Estilo da Tela de Bloqueio */
+        
+        #tela-bloqueio {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #111827;
+            /* Fundo escuro */
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        /* Esconde o conteúdo principal inicialmente */
+        
+        #conteudo-principal {
+            filter: blur(10px);
+            /* Opcional: efeito borrado no fundo */
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 overflow-hidden">
+
+    <!-- === TELA DE BLOQUEIO (LOGIN) === -->
+    <div id="tela-bloqueio">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+            <div class="mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <h2 class="text-2xl font-bold text-gray-800 mt-4">Área Restrita</h2>
+                <p class="text-gray-500 text-sm">Monitoramento Climático Equatorial</p>
+            </div>
+
+            <input type="password" id="senha-input" placeholder="Digite a senha de acesso..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none mb-4 text-center text-lg" onkeypress="verificarEnter(event)">
+
+            <button onclick="verificarSenha()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
+                Entrar
+            </button>
+
+            <p id="msg-erro" class="text-red-500 text-sm mt-3 hidden font-semibold">Senha incorreta.</p>
+        </div>
+        <p class="text-gray-500 text-xs mt-8">Sistema Interno - Uso Exclusivo</p>
+    </div>
+
+    <!-- === CONTEÚDO REAL DO SITE (Escondido inicialmente) === -->
+    <div id="conteudo-principal" style="visibility: hidden;">
+        <!-- Usamos visibility para o mapa carregar tamanho certo -->
+
+        <!-- Botão Toggle Sidebar -->
+        <button id="toggle-sidebar-btn" class="absolute top-5 left-5 z-[2500] p-2 bg-white/90 rounded-lg shadow-md hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-800">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+        </button>
+
+        <div class="flex h-screen">
+            <!-- Sidebar -->
+            <aside id="sidebar" class="w-80 flex-shrink-0 bg-white p-6 shadow-lg overflow-y-auto z-30 flex flex-col">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800 ml-12">Filtros</h2>
+
+                <!-- Busca -->
+                <div class="mb-6 relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Buscar Município</label>
+                    <div class="flex">
+                        <input type="text" id="search-input" placeholder="Nome..." class="w-full rounded-l-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="search-btn" class="bg-blue-600 text-white px-3 rounded-r-md hover:bg-blue-700">🔍</button>
+                    </div>
+                    <div id="search-error" class="text-xs text-red-500 mt-1 hidden">Não encontrado.</div>
+                </div>
+
+                <!-- Tipo de Dado -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Dado</label>
+                    <div class="flex space-x-4">
+                        <div class="flex items-center">
+                            <input id="tipo-chuva" name="tipoDado" type="radio" value="chuva" class="h-4 w-4 text-blue-600" checked>
+                            <label for="tipo-chuva" class="ml-2 text-sm text-gray-900">Chuva (mm)</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="tipo-vento" name="tipoDado" type="radio" value="vento" class="h-4 w-4 text-blue-600">
+                            <label for="tipo-vento" class="ml-2 text-sm text-gray-900">Vento (km/h)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datas Dinâmicas -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Dia da Previsão</label>
+                    <div id="date-filter-container" class="space-y-2">
+                        <p class="text-sm text-gray-500">A carregar datas...</p>
+                    </div>
+                </div>
+
+                <!-- Ranking -->
+                <div class="mb-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <h3 class="text-sm font-bold text-gray-700 mb-2">Destaques (Top 3)</h3>
+                    <ul id="top-ranking-list" class="text-xs space-y-1 text-gray-600">
+                        <li>A carregar...</li>
+                    </ul>
+                </div>
+
+                <hr class="my-4 border-gray-200">
+
+                <!-- Legendas -->
+                <div id="legenda-chuva">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800">Legenda Chuva (mm)</h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-blue-200 border border-blue-300 mr-3"></span> &lt; 5mm (Leve)</div>
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-orange-400 border border-orange-500 mr-3"></span> 5-9mm (Moderada)</div>
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-red-600 border border-red-700 mr-3"></span> 10-19mm (Forte)</div>
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-gray-900 border border-black mr-3"></span> &gt;= 20mm (Tempestade)</div>
+                    </div>
+                </div>
+
+                <div id="legenda-vento" class="hidden mt-6">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800">Legenda Vento (km/h)</h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-emerald-200 border border-emerald-300 mr-3"></span> &lt; 20 (Leve)</div>
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-yellow-400 border border-yellow-500 mr-3"></span> 20-34 (Moderado)</div>
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-orange-600 border border-orange-700 mr-3"></span> 35-44 (Forte)</div>
+                        <div class="flex items-center"><span class="h-4 w-4 rounded bg-rose-700 border border-rose-800 mr-3"></span> &gt;= 45 (Vendaval)</div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="flex-1 flex flex-col overflow-hidden relative">
+                <!-- CABEÇALHO -->
+                <header class="absolute top-0 left-0 right-0 bg-white/90 backdrop-blur-sm shadow-sm py-3 px-4 z-[2400] mx-4 mt-4 rounded-lg flex justify-between items-center max-w-4xl">
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900 leading-tight">Monitoramento Goiás</h1>
+                        <div class="flex gap-3 text-xs font-semibold mt-1">
+                            <span class="text-gray-500">GeoJSON Visualizer</span>
+                            <span id="data-atualizacao" class="text-emerald-700">A aguardar dados...</span>
+                        </div>
+                    </div>
+
+                    <button id="btn-avisos" class="flex items-center bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        <span class="font-bold text-sm">Ver Alertas</span>
+                    </button>
+                </header>
+                <div id="map"></div>
+            </main>
+        </div>
+
+        <!-- MODAL DE ALERTAS -->
+        <div id="modal-avisos" class="fixed inset-0 z-[3000] bg-black/60 hidden flex items-center justify-center backdrop-blur-sm transition-opacity duration-300">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden transform transition-all scale-100 border border-gray-200">
+                <div class="bg-red-600 px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-white font-bold text-lg flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 mr-2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                        </svg> Relatório de Alertas
+                    </h3>
+                    <button id="btn-fechar-avisos" class="text-white hover:bg-red-700 p-1 rounded-full transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 max-h-[60vh] overflow-y-auto bg-gray-50">
+                    <p id="texto-avisos-conteudo" class="text-gray-800 text-sm leading-relaxed whitespace-pre-line border-l-4 border-red-500 pl-4 py-1">
+                        A carregar informações...
+                    </p>
+                </div>
+                <div class="bg-gray-100 px-6 py-3 text-right border-t border-gray-200">
+                    <button id="btn-fechar-rodape" class="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm font-medium transition-colors">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE SEGURANÇA SIMPLIFICADA -->
+    <script>
+        // CONFIGURAÇÃO DA SENHA AQUI
+        const SENHA_CORRETA = "equatorial2025";
+
+        function verificarSenha() {
+            const input = document.getElementById('senha-input');
+            const erro = document.getElementById('msg-erro');
+            const tela = document.getElementById('tela-bloqueio');
+            const conteudo = document.getElementById('conteudo-principal');
+            const body = document.body;
+
+            if (input.value === SENHA_CORRETA) {
+                // Senha certa: Esconde bloqueio, mostra site
+                tela.style.opacity = '0';
+                setTimeout(() => tela.style.display = 'none', 500);
+
+                conteudo.style.visibility = 'visible';
+                conteudo.style.filter = 'none';
+                conteudo.style.pointerEvents = 'auto';
+                body.classList.remove('overflow-hidden');
+
+                // Recarrega tamanho do mapa (Leaflet precisa disso)
+                if (typeof map !== 'undefined') map.invalidateSize();
+            } else {
+                // Senha errada
+                erro.classList.remove('hidden');
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function verificarEnter(e) {
+            if (e.key === "Enter") verificarSenha();
+        }
+    </script>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- DADOS -->
+    <script>
+        function load(u) {
+            document.write('<script src="' + u + '?v=' + Date.now() + '"><\/script>');
+        }
+        load('dados/estado.js');
+        load('dados/municipios.js');
+        load('js/marcadores.js');
+        load('js/climaticos.js');
+        load('js/app.js');
+    </script>
+</body>
+
+</html>
